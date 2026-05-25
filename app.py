@@ -1,143 +1,227 @@
 # app.py
 import streamlit as st
+import streamlit.components.v1 as components
 import networkx as nx
-import numpy as np
-import matplotlib.pyplot as plt
+import json
 
-# Set up page configuration
-st.set_page_config(
-    page_title="Matrix Representation of Graphs",
-    page_icon="🕸️",
-    layout="wide"
-)
+# Page Setup
+st.set_page_config(page_title="Week 2: Graph Representations", layout="wide")
 
-st.title("🎓 Week 2: Matrix Representation of Graphs Crash Course")
-st.write("Understand how graphs become machine-readable through code and interactive visuals.")
+st.title("🎓 Week 2 Crash Course: Matrix Representations & D3.js")
+st.write("Explore how visual graphs translate into machine-readable mathematical models, rendered in real-time using D3.js.")
 
 # --- SIDEBAR NAV ---
-st.sidebar.header("Navigation")
-section = st.sidebar.radio("Go to:", ["Theory & Intuition", "Interactive Conversion Tool"])
+st.sidebar.header("Course Navigation")
+section = st.sidebar.radio("Go to:", ["1. Learn Intuition & Theory", "2. Interactive Python-to-D3 Tool"])
 
-# --- SECTION 1: THEORY ---
-if section == "Theory & Intuition":
-    st.header("🏗️ Learn Intuition")
+# ==========================================
+# SECTION 1: THEORY & INTUITION
+# ==========================================
+if section == "1. Learn Intuition & Theory":
+    st.header("🏗️ Core Intuition")
     
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("Why Graphs Defy Normal Neural Networks")
+        st.subheader("Why Standard NNs Struggle with Graphs")
         st.write("""
-        Traditional neural networks (like CNNs or RNNs) expect data to be structured in neat, predictable grids or sequences (like pixels or text tokens). 
+        Traditional architectures (like CNNs or RNNs) expect grids or sequences—data with a fixed grid structure or sequential order. 
         
-        Graphs break these rules entirely:
-        * **No fixed structure:** A node can have one neighbor, fifty neighbors, or zero.
-        * **Permutation invariance:** If you shuffle the order of rows/columns in your network data, it represents the exact same graph. Standard neural networks get confused by this lack of inherent order.
+        Graphs break these paradigms:
+        - **Varying Topology:** A node can have zero neighbors or millions.
+        - **Permutation Invariance:** Shuffling the structural list index changes the matrix layout entirely, but the underlying physical graph remains identical.
         """)
         
     with col2:
-        st.subheader("The Math Focus")
+        st.subheader("Mathematical Focus")
         st.write("""
-        * **Matrix Multiplication Intuition:** Multiplying a graph's structure matrix by a feature matrix allows nodes to effortlessly aggregate data from their immediate neighbors.
-        * **Eigenvectors:** Think of them as the 'vibe check' of a graph. They highlight the underlying backbone structural layout, showing which clusters naturally bind together.
-        * **Message Propagation:** This is the act of a node collecting information packets from neighbors, combining them with its own, and updating its state.
+        - **Matrix Multiplication:** Allows nodes to cleanly pull, weight, and aggregate context matrices from their connected neighbors.
+        - **Eigenvectors:** Define structural backbones, showing where data naturally clusters or flows.
+        - **Message Propagation:** The structural dance where nodes gather neighbor embeddings, mix them with local attributes, and update state steps.
         """)
 
     st.write("---")
-    st.header("🧩 Core Concepts Breakdown")
+    st.subheader("🧩 Key Graph Matrices")
     
-    # Core Data Table
-    concepts_data = {
-        "Concept": ["Adjacency Matrix", "Edge List", "Sparse Matrices", "Feature Matrices", "Laplacian Matrix"],
-        "What It Is": [
-            "A square matrix where index (i, j) indicates if an edge exists between node i and node j.",
-            "A simple list of pairs [source, target] representing connections.",
-            "A memory-efficient way to store matrices that consist mostly of zeros.",
-            "A matrix of shape (num_nodes, num_features) holding the unique attributes of each node.",
-            "Calculated as L = D - A (Degree matrix minus Adjacency matrix), used for structural diffusion."
-        ],
-        "Best Used For": [
-            "Dense graphs; lightning-fast structural lookups.",
-            "Storing raw graph datasets efficiently.",
-            "Large, real-world graphs where connections are rare.",
-            "Giving real-world context to structural layouts.",
-            "Graph physics, clustering, and spectral graph theory."
+    st.table({
+        "Representation": ["Adjacency Matrix", "Edge List", "Sparse Matrix", "Feature Matrix", "Laplacian Matrix"],
+        "Mathematical Purpose": [
+            "A square matrix where index A[i][j] = 1 indicates a connection.",
+            "A streamlined list of pairs mapping [source, target] connections directly.",
+            "Memory-saving compressed arrays that ignore zeros in mostly-disconnected systems.",
+            "An N x F array storing the real-world properties/attributes of every individual node.",
+            "Calculated as L = D - A (Degree minus Adjacency). Used to analyze graph diffusion and layout physics."
         ]
-    }
-    st.table(concepts_data)
+    })
 
-# --- SECTION 2: INTERACTIVE TOOL ---
-elif section == "Interactive Conversion Tool":
-    st.header("💻 Practical Graph Matrix Converter")
-    st.write("Toggle between graph directions to see how data representation changes seamlessly in real-time.")
+# ==========================================
+# SECTION 2: INTERACTIVE PIPELINE TOOL
+# ==========================================
+elif section == "2. Interactive Python-to-D3 Tool":
+    st.header("💻 Interactive Force-Directed Graph Pipeline")
+    st.write("Modify the graph structure in Python using the checkboxes. NetworkX processes the math, and passes the network to **D3.js** for browser physics rendering.")
 
-    tab1, tab2 = st.tabs(["Graph ➔ Adjacency Matrix", "Adjacency Matrix ➔ Graph"])
-
-    # TAB 1: Graph to Matrix
-    with tab1:
-        st.subheader("Construct a Graph Visual to Generate Matrices")
-        
-        # User input for edges
-        num_nodes = st.slider("Select number of nodes", min_value=3, max_value=6, value=4, key="g_nodes")
-        
-        st.write("Select which edges to connect:")
-        edges = []
-        # Generate possible edge check-boxes dynamically
-        for i in range(num_nodes):
-            for j in range(i + 1, num_nodes):
-                if st.checkbox(f"Connect Node {i} to Node {j}", value=(i==0 or j==i+1)):
+    # Python State Configuration
+    st.subheader("Step 1: Configure Graph Structure (Python)")
+    num_nodes = st.slider("Total Nodes:", min_value=3, max_value=7, value=5)
+    
+    # Generate dynamic interaction checkboxes for potential edges
+    st.write("Toggle Connections:")
+    edges = []
+    cols = st.columns(3)
+    idx = 0
+    for i in range(num_nodes):
+        for j in range(i + 1, num_nodes):
+            with cols[idx % 3]:
+                # Pre-check a few boxes for an attractive starting shape
+                is_default = (i == 0 or j == i + 1)
+                if st.checkbox(f"Connect {i} ↔ {j}", value=is_default, key=f"e_{i}_{j}"):
                     edges.append((i, j))
-        
-        # Build networkx graph
-        G = nx.Graph()
-        G.add_nodes_from(range(num_nodes))
-        G.add_edges_from(edges)
-        
-        # Plot
-        fig, ax = plt.subplots(figsize=(4, 3))
-        pos = nx.spring_layout(G, seed=42)
-        nx.draw(G, pos, with_labels=True, node_color='#4A90E2', node_size=500, font_color='white', font_weight='bold', ax=ax)
-        
-        col_img, col_mat = st.columns(2)
-        with col_img:
-            st.pyplot(fig)
-        with col_mat:
-            st.markdown("**Generated Adjacency Matrix:**")
-            adj_matrix = nx.to_numpy_array(G, dtype=int)
-            st.code(str(adj_matrix))
-            
-            st.markdown("**Generated Edge List:**")
-            st.code(str(edges))
+            idx += 1
 
-    # TAB 2: Matrix to Graph
-    with tab2:
-        st.subheader("Input an Adjacency Matrix to Generate a Graph")
-        st.write("Edit the binary connectivity matrix below (4x4 matrix representation):")
+    # --- COMPUTATION WITH NETWORKX ---
+    G = nx.Graph()
+    G.add_nodes_from(range(num_nodes))
+    G.add_edges_from(edges)
+    
+    # Extract matrices using NetworkX
+    adj_matrix = nx.to_numpy_array(G, dtype=int).tolist()
+    edge_list = list(G.edges())
+    
+    # Format the data cleanly into the explicit JSON format D3 force graphs require
+    d3_data = {
+        "nodes": [{"id": str(n), "label": f"Node {n}"} for n in G.nodes()],
+        "links": [{"source": str(u), "target": str(v)} for u, v in G.edges()]
+    }
+
+    st.write("---")
+    
+    # Screen Layout Split
+    col_left, col_right = st.columns([1, 1])
+    
+    with col_left:
+        st.subheader("Step 2: Machine-Readable Output")
+        st.markdown("**Adjacency Matrix ($A$):**")
+        st.code(str(nx.to_numpy_array(G, dtype=int)))
         
-        # Interactive Matrix creation via columns
-        matrix_input = np.zeros((4, 4), dtype=int)
+        st.markdown("**Edge List Data:**")
+        st.code(str(edge_list))
+
+    with col_right:
+        st.subheader("Step 3: D3.js Force-Directed Rendering")
         
-        for r in range(4):
-            cols = st.columns(4)
-            for c in range(4):
-                with cols[c]:
-                    # Default values to make a nice initial graph shape
-                    default_val = 1 if ((r==0 and c==1) or (r==1 and c==0) or (r==1 and c==2) or (r==2 and c==1) or (r==2 and c==3) or (r==3 and c==2)) else 0
-                    matrix_input[r, r] = 0 # Forces no self loops for simplicity
-                    if r != c:
-                        matrix_input[r, c] = cols[c].number_input(f"Row {r}, Col {c}", min_value=0, max_value=1, value=default_val, key=f"m_{r}_{c}")
+        # --- EMBEDDED D3.JS RUNTIME INJECTION ---
+        d3_html_template = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script src="https://d3js.org/d3.v7.min.js"></script>
+            <style>
+                body {{
+                    margin: 0;
+                    background-color: transparent;
+                    font-family: sans-serif;
+                }}
+                .node {{
+                    fill: #FF4B4B;
+                    stroke: #fff;
+                    stroke-width: 2px;
+                    cursor: pointer;
+                }}
+                .link {{
+                    stroke: #999;
+                    stroke-opacity: 0.6;
+                    stroke-width: 2px;
+                }}
+                text {{
+                    fill: #31333F;
+                    font-size: 12px;
+                    font-weight: bold;
+                    pointer-events: none;
+                }}
+            </style>
+        </head>
+        <body>
+            <svg width="500" height="300"></svg>
+            <script>
+                // Data injected straight from NetworkX processing pipeline
+                const graphData = {json.dumps(d3_data)};
+
+                const svg = d3.select("svg");
+                const width = +svg.attr("width");
+                const height = +svg.attr("height");
+
+                // Initialize Force Simulator
+                const simulation = d3.forceSimulation(graphData.nodes)
+                    .force("link", d3.forceLink(graphData.links).id(d => d.id).distance(80))
+                    .force("charge", d3.forceManyBody().strength(-150))
+                    .force("center", d3.forceCenter(width / 2, height / 2));
+
+                // Draw Link elements
+                const link = svg.append("g")
+                    .attr("class", "links")
+                    .selectAll("line")
+                    .data(graphData.links)
+                    .enter().append("line")
+                    .attr("class", "link");
+
+                // Draw Node elements
+                const node = svg.append("g")
+                    .attr("class", "nodes")
+                    .selectAll("circle")
+                    .data(graphData.nodes)
+                    .enter().append("circle")
+                    .attr("class", "node")
+                    .attr("r", 14)
+                    .call(d3.drag()
+                        .on("start", dragstarted)
+                        .on("drag", dragged)
+                        .on("end", dragended));
+
+                // Add Text Node Labels
+                const labels = svg.append("g")
+                    .selectAll("text")
+                    .data(graphData.nodes)
+                    .enter().append("text")
+                    .attr("dx", 18)
+                    .attr("dy", 4)
+                    .text(d => d.label);
+
+                // Update physical coordinate positions loop on tick
+                simulation.on("tick", () => {{
+                    link
+                        .attr("x1", d => d.source.x)
+                        .attr("y1", d => d.source.y)
+                        .attr("x2", d => d.target.x)
+                        .attr("y2", d => d.target.y);
+
+                    node
+                        .attr("cx", d => d.x)
+                        .attr("cy", d => d.y);
+
+                    labels
+                        .attr("x", d => d.x)
+                        .attr("y", d => d.y);
+                }});
+
+                // Dragging Interactivity Handlers
+                function dragstarted(event, d) {{
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }}
+                function dragged(event, d) {{
+                    d.fx = event.x;
+                    d.fy = event.y;
+                }}
+                function dragended(event, d) {{
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                }}
+            </script>
+        </body>
+        </html>
+        """
         
-        st.write("---")
-        # Build graph from the custom user matrix input
-        G_custom = nx.from_numpy_array(matrix_input)
-        
-        col_mat_out, col_graph_out = st.columns(2)
-        with col_mat_out:
-            st.markdown("**Your Custom Matrix Input:**")
-            st.code(str(matrix_input))
-            st.markdown(f"**Identified Edges:** {list(G_custom.edges)}")
-            
-        with col_graph_out:
-            st.markdown("**Reconstructed Visual Graph Output:**")
-            fig2, ax2 = plt.subplots(figsize=(4, 3))
-            pos2 = nx.circular_layout(G_custom)
-            nx.draw(G_custom, pos2, with_labels=True, node_color='#E24A84', node_size=500, font_color='white', font_weight='bold', ax=ax2)
-            st.pyplot(fig2)
+        # Render the raw generated D3 platform output block inside the Streamlit view
+        components.html(d3_html_template, height=320, scrolling=False)
